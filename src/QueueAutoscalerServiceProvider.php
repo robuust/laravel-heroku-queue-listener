@@ -10,13 +10,22 @@ use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
+/**
+ * Registers and wires queue autoscaling listeners for Laravel applications.
+ */
 class QueueAutoscalerServiceProvider extends ServiceProvider
 {
+    /**
+     * Register package services and merge default configuration.
+     */
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/queue-autoscaler.php', 'queue-autoscaler');
     }
 
+    /**
+     * Bootstrap package configuration publishing and event listeners.
+     */
     public function boot(): void
     {
         $this->publishes([
