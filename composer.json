@@ -1,0 +1,28 @@
+{
+    "name": "robuust/laravel-heroku-queue-listener",
+    "description": "Laravel package to autoscale Heroku queue workers based on queue events",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/contracts": "^11.0|^12.0",
+        "illuminate/events": "^11.0|^12.0",
+        "illuminate/queue": "^11.0|^12.0",
+        "illuminate/support": "^11.0|^12.0",
+        "php-heroku-client/php-heroku-client": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Robuust\\HerokuQueueListener\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Robuust\\HerokuQueueListener\\QueueAutoscalerServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
