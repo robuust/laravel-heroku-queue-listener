@@ -21,6 +21,7 @@ class QueueInspector
     {
         $defaultConnection = (string) config('queue.default', 'database');
         $defaultDriver = (string) config("queue.connections.{$defaultConnection}.driver", 'database');
+        $queue = (string) config("queue.connections.{$defaultConnection}.queue", 'default');
 
         if ($defaultDriver !== 'database') {
             return Queue::size();
@@ -31,8 +32,11 @@ class QueueInspector
 
         try {
             return DB::table($table)
-                ->where('available_at', '<=', $timestamp)
-                ->orWhereNotNull('reserved_at')
+                ->where('queue', $queue)
+                ->where(function ($query) use ($timestamp) {
+                    $query->where('available_at', '<=', $timestamp)
+                        ->orWhereNotNull('reserved_at');
+                })
                 ->count();
         } catch (Throwable) {
             return Queue::size();
