@@ -11,8 +11,20 @@ use Robuust\HerokuQueueListener\Support\QueueInspector;
 
 class DispatchHeartbeatJob extends Command
 {
-    protected $signature = 'workers:dispatch-heartbeat {--timeframe= : Time window in minutes to check for queued jobs}';
+    /**
+     * The name and signature of the console command.
+     *
+     * Example usage: php artisan workers:dispatch-heartbeat
+     *
+     * @var string
+     */
+    protected $signature = 'workers:dispatch-heartbeat';
 
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
     protected $description = 'Dispatch a Heartbeat job to spin up a dyno worker if needed.';
 
     /**
@@ -22,7 +34,7 @@ class DispatchHeartbeatJob extends Command
      */
     public function handle(): int
     {
-        $timeframe = $this->determineTimeframe();
+        $timeframe = (int) config('queue-autoscaler.timeframe_minutes', 2);
         $queueSize = QueueInspector::countJobsWithinTimeframe($timeframe);
 
         if ($queueSize === 0) {
@@ -36,22 +48,5 @@ class DispatchHeartbeatJob extends Command
         Queue::push(new Heartbeat());
 
         return self::SUCCESS;
-    }
-
-    /**
-     * Determine the effective timeframe in minutes from option or package config.
-     *
-     * @return int
-     */
-    private function determineTimeframe(): int
-    {
-        $timeframe = (int) config('queue-autoscaler.timeframe_minutes', 2);
-        $option = $this->option('timeframe');
-
-        if (is_numeric($option)) {
-            $timeframe = (int) $option;
-        }
-
-        return max($timeframe, 0);
     }
 }
