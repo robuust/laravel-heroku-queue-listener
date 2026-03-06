@@ -10,11 +10,15 @@ use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Robuust\HerokuQueueListener\Support\QueueInspector;
 
 class QueueAutoscalerListener
 {
     /**
      * Handle queue events and autoscale workers.
+     *
+     * @param object $event Queue event instance that triggered the listener.
+     * @return void
      */
     public function handle(object $event): void
     {
@@ -35,13 +39,20 @@ class QueueAutoscalerListener
             return;
         }
 
-        if (Queue::size() === 0) {
+        $timeframe = (int) config('queue-autoscaler.timeframe_minutes', 2);
+
+        if (QueueInspector::countJobsWithinTimeframe($timeframe) === 0) {
             $this->scaleWorkers($appName, $apiKey, 0);
         }
     }
 
     /**
      * Scale Heroku workers to the specified quantity.
+     *
+     * @param string $appName Heroku app name.
+     * @param string $apiKey Heroku API key.
+     * @param int $quantity Desired worker dyno quantity.
+     * @return void
      */
     protected function scaleWorkers(string $appName, string $apiKey, int $quantity): void
     {

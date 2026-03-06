@@ -7,6 +7,9 @@ return [
     // Optionally listen to an application release event and scale up only when jobs exist.
     'release_event' => env('QUEUE_AUTOSCALER_RELEASE_EVENT', 'App\\Events\\AppReleased'),
 
+    // Time window in minutes used to detect due/reserved jobs for scale-down and heartbeat dispatching.
+    'timeframe_minutes' => (int) env('QUEUE_AUTOSCALER_TIMEFRAME_MINUTES', 2),
+
     'cache_key' => env('QUEUE_AUTOSCALER_CACHE_KEY', 'queue-autoscaler:current-dynos'),
     'cache_ttl_seconds' => (int) env('QUEUE_AUTOSCALER_CACHE_TTL_SECONDS', 3600),
 ];
