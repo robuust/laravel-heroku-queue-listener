@@ -38,16 +38,16 @@ php artisan vendor:publish --tag=queue-autoscaler-config
 
 ## Heartbeat
 
-For delayed/backoff jobs, you can periodically dispatch a heartbeat pulse so Heroku workers wake up on demand:
+For delayed/backoff jobs, you can periodically check due/reserved jobs and scale workers up on demand:
 
 ```bash
 php artisan workers:dispatch-heartbeat
 ```
 
-The command checks for due/reserved jobs within `QUEUE_AUTOSCALER_TIMEFRAME_MINUTES`. If none are found, it will not dispatch a heartbeat job.
+The command checks for due/reserved jobs within `QUEUE_AUTOSCALER_TIMEFRAME_MINUTES`. If none are found, it will not scale workers up.
 For timeframe-based autoscaling, set `QUEUE_AUTOSCALER_MODE=timeframe`.
 
-Typical scheduler usage:
+Typical Laravel scheduler usage:
 
 ```php
 Schedule::command('workers:dispatch-heartbeat')->everyMinute();

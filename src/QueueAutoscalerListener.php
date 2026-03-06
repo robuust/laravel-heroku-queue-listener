@@ -15,10 +15,26 @@ use Robuust\HerokuQueueListener\Support\QueueInspector;
 class QueueAutoscalerListener
 {
     /**
+     * Scale workers up to one dyno when Heroku credentials are configured.
+     *
+     * @return void
+     */
+    public function scaleUpConfiguredWorkers(): void
+    {
+        $apiKey = (string) config('queue-autoscaler.heroku_api_key');
+        $appName = (string) config('queue-autoscaler.heroku_app_name');
+
+        if ($apiKey === '' || $appName === '') {
+            return;
+        }
+
+        $this->scaleWorkers($appName, $apiKey, 1);
+    }
+
+    /**
      * Handle queue events and autoscale workers.
      *
      * @param object $event Queue event instance that triggered the listener.
-     
      * @return void
      */
     public function handle(object $event): void
@@ -57,7 +73,6 @@ class QueueAutoscalerListener
      * @param string $appName Heroku app name.
      * @param string $apiKey Heroku API key.
      * @param int $quantity Desired worker dyno quantity.
-     
      * @return void
      */
     protected function scaleWorkers(string $appName, string $apiKey, int $quantity): void

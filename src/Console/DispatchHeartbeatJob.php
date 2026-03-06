@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Robuust\HerokuQueueListener\Console;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Queue;
-use Robuust\HerokuQueueListener\Jobs\Heartbeat;
+use Robuust\HerokuQueueListener\QueueAutoscalerListener;
 use Robuust\HerokuQueueListener\Support\QueueInspector;
 
 class DispatchHeartbeatJob extends Command
@@ -25,7 +24,7 @@ class DispatchHeartbeatJob extends Command
      *
      * @var string
      */
-    protected $description = 'Dispatch a Heartbeat job to spin up a dyno worker if needed.';
+    protected $description = 'Scale up a worker dyno when jobs exist within the configured timeframe.';
 
     /**
      * Execute the console command.
@@ -38,14 +37,14 @@ class DispatchHeartbeatJob extends Command
         $queueSize = QueueInspector::countJobsWithinTimeframe($timeframe);
 
         if ($queueSize === 0) {
-            $this->info('No jobs found in timeframe. Heartbeat will not be dispatched.');
+            $this->info('No jobs found in timeframe. Workers will not be scaled up.');
 
             return self::SUCCESS;
         }
 
-        $this->info("{$queueSize} job(s) found in timeframe. Dispatching Heartbeat.");
+        $this->info("{$queueSize} job(s) found in timeframe. Scaling workers up.");
 
-        Queue::push(new Heartbeat());
+        app(QueueAutoscalerListener::class)->scaleUpConfiguredWorkers();
 
         return self::SUCCESS;
     }
