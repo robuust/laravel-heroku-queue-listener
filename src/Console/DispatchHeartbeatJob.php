@@ -22,7 +22,7 @@ class DispatchHeartbeatJob extends Command
      */
     public function handle(): int
     {
-        $timeframe = $this->resolveTimeframeOption();
+        $timeframe = $this->determineTimeframe();
         $queueSize = QueueInspector::countJobsWithinTimeframe($timeframe);
 
         if ($queueSize === 0) {
@@ -39,11 +39,11 @@ class DispatchHeartbeatJob extends Command
     }
 
     /**
-     * Resolve the effective timeframe in minutes from option or package config.
+     * Determine the effective timeframe in minutes from option or package config.
      *
      * @return int
      */
-    private function resolveTimeframeOption(): int
+    private function determineTimeframe(): int
     {
         $timeframe = (int) config('queue-autoscaler.timeframe_minutes', 2);
         $option = $this->option('timeframe');
