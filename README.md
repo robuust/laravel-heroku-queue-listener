@@ -34,9 +34,9 @@ php artisan vendor:publish --tag=queue-autoscaler-config
 ### Scaling Modes
 
 - `classic`: scales down only when `Queue::size() === 0` (legacy behavior).
-- `timeframe`: scales down only when there are no due/reserved jobs within `QUEUE_AUTOSCALER_TIMEFRAME_MINUTES`.
+- `timeframe`: scales down only when there are no due/reserved jobs available. Can look a few minutes in the future to determine this using `QUEUE_AUTOSCALER_TIMEFRAME_MINUTES`.
 
-## Experimental Heartbeat
+## Heartbeat
 
 For delayed/backoff jobs, you can periodically dispatch a heartbeat pulse so Heroku workers wake up on demand:
 
@@ -45,7 +45,7 @@ php artisan workers:dispatch-heartbeat
 ```
 
 The command checks for due/reserved jobs within `QUEUE_AUTOSCALER_TIMEFRAME_MINUTES`. If none are found, it will not dispatch a heartbeat job.
-For experimental timeframe-based autoscaling, set `QUEUE_AUTOSCALER_MODE=timeframe`.
+For timeframe-based autoscaling, set `QUEUE_AUTOSCALER_MODE=timeframe`.
 
 Typical scheduler usage:
 
