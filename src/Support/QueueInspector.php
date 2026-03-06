@@ -15,6 +15,7 @@ class QueueInspector
      * Count jobs due within the given timeframe (minutes), including reserved jobs.
      *
      * @param int $minutes Time window in minutes.
+     
      * @return int
      */
     public static function countJobsWithinTimeframe(int $minutes): int
