@@ -7,6 +7,9 @@ return [
     // Optionally listen to an application release event and scale up only when jobs exist.
     'release_event' => env('QUEUE_AUTOSCALER_RELEASE_EVENT', 'App\\Events\\AppReleased'),
 
+    // Scaling mode: "classic" uses Queue::size(), "timeframe" uses due/reserved jobs within timeframe_minutes.
+    'mode' => env('QUEUE_AUTOSCALER_MODE', 'classic'),
+
     // Time window in minutes used to detect due/reserved jobs for scale-down and heartbeat dispatching.
     'timeframe_minutes' => (int) env('QUEUE_AUTOSCALER_TIMEFRAME_MINUTES', 2),
 

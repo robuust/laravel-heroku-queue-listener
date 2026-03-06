@@ -20,6 +20,7 @@ Set the following environment variables:
 Optional:
 
 - `QUEUE_AUTOSCALER_RELEASE_EVENT` (defaults to `App\\Events\\AppReleased`)
+- `QUEUE_AUTOSCALER_MODE` (defaults to `classic`)
 - `QUEUE_AUTOSCALER_TIMEFRAME_MINUTES` (defaults to `2`)
 - `QUEUE_AUTOSCALER_CACHE_KEY` (defaults to `queue-autoscaler:current-dynos`)
 - `QUEUE_AUTOSCALER_CACHE_TTL_SECONDS` (defaults to `3600`)
@@ -30,6 +31,11 @@ Publish config if needed:
 php artisan vendor:publish --tag=queue-autoscaler-config
 ```
 
+### Scaling Modes
+
+- `classic`: scales down only when `Queue::size() === 0` (legacy behavior).
+- `timeframe`: scales down only when there are no due/reserved jobs within `QUEUE_AUTOSCALER_TIMEFRAME_MINUTES`.
+
 ## Experimental Heartbeat
 
 For delayed/backoff jobs, you can periodically dispatch a heartbeat pulse so Heroku workers wake up on demand:
@@ -39,6 +45,7 @@ php artisan workers:dispatch-heartbeat
 ```
 
 The command checks for due/reserved jobs within `QUEUE_AUTOSCALER_TIMEFRAME_MINUTES`. If none are found, it will not dispatch a heartbeat job.
+For experimental timeframe-based autoscaling, set `QUEUE_AUTOSCALER_MODE=timeframe`.
 
 Typical scheduler usage:
 

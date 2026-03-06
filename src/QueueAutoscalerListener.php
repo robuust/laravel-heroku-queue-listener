@@ -39,9 +39,13 @@ class QueueAutoscalerListener
             return;
         }
 
+        $mode = strtolower((string) config('queue-autoscaler.mode', 'classic'));
         $timeframe = (int) config('queue-autoscaler.timeframe_minutes', 2);
+        $shouldScaleDown = $mode === 'timeframe'
+            ? QueueInspector::countJobsWithinTimeframe($timeframe) === 0
+            : Queue::size() === 0;
 
-        if (QueueInspector::countJobsWithinTimeframe($timeframe) === 0) {
+        if ($shouldScaleDown) {
             $this->scaleWorkers($appName, $apiKey, 0);
         }
     }
