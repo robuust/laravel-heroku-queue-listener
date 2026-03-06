@@ -10,7 +10,7 @@ return [
     // Scaling mode: "classic" uses Queue::size(), "timeframe" uses due/reserved jobs within timeframe_minutes.
     'mode' => env('QUEUE_AUTOSCALER_MODE', 'classic'),
 
-    // Time window in minutes used to detect due/reserved jobs for scale-down and heartbeat dispatching.
+    // Time window in minutes used to detect due/reserved jobs for scale-down and heartbeat dispatching. Only applies if mode is set to "timeframe".
     'timeframe_minutes' => (int) env('QUEUE_AUTOSCALER_TIMEFRAME_MINUTES', 2),
 
     'cache_key' => env('QUEUE_AUTOSCALER_CACHE_KEY', 'queue-autoscaler:current-dynos'),
