@@ -40,7 +40,7 @@ class QueueAutoscalerListener
             return;
         }
 
-        $mode = strtolower((string) config('queue-autoscaler.mode', 'classic'));
+        $mode = strtolower(config('queue-autoscaler.mode', 'default'));
         $timeframe = (int) config('queue-autoscaler.timeframe_minutes', 2);
         $shouldScaleDown = $mode === 'timeframe'
             ? QueueInspector::countJobsWithinTimeframe($timeframe) === 0

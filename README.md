@@ -20,7 +20,7 @@ Set the following environment variables:
 Optional:
 
 - `QUEUE_AUTOSCALER_RELEASE_EVENT` (defaults to `App\\Events\\AppReleased`)
-- `QUEUE_AUTOSCALER_MODE` (defaults to `classic`)
+- `QUEUE_AUTOSCALER_MODE` (defaults to `default`)
 - `QUEUE_AUTOSCALER_TIMEFRAME_MINUTES` (defaults to `2`)
 - `QUEUE_AUTOSCALER_CACHE_KEY` (defaults to `queue-autoscaler:current-dynos`)
 - `QUEUE_AUTOSCALER_CACHE_TTL_SECONDS` (defaults to `3600`)
@@ -33,7 +33,7 @@ php artisan vendor:publish --tag=queue-autoscaler-config
 
 ### Scaling Modes
 
-- `classic`: scales down only when `Queue::size() === 0` (legacy behavior).
+- `default`: scales down only when `Queue::size() === 0`.
 - `timeframe`: scales down only when there are no due/reserved jobs available. Can look a few minutes in the future to determine this using `QUEUE_AUTOSCALER_TIMEFRAME_MINUTES`.
 
 ## Heartbeat

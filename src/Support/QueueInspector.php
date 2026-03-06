@@ -20,15 +20,15 @@ class QueueInspector
      */
     public static function countJobsWithinTimeframe(int $minutes): int
     {
-        $defaultConnection = (string) config('queue.default', 'database');
-        $defaultDriver = (string) config("queue.connections.{$defaultConnection}.driver", 'database');
-        $queue = (string) config("queue.connections.{$defaultConnection}.queue", 'default');
+        $defaultConnection = config('queue.default', 'database');
+        $defaultDriver = config("queue.connections.{$defaultConnection}.driver", 'database');
+        $queue = config("queue.connections.{$defaultConnection}.queue", 'default');
 
         if ($defaultDriver !== 'database') {
             return Queue::size();
         }
 
-        $table = (string) config("queue.connections.{$defaultConnection}.table", config('queue.connections.database.table', 'jobs'));
+        $table = config("queue.connections.{$defaultConnection}.table", config('queue.connections.database.table', 'jobs'));
         $timestamp = Carbon::now()->addMinutes($minutes)->timestamp;
 
         try {
