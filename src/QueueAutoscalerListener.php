@@ -35,6 +35,7 @@ class QueueAutoscalerListener
      * Handle queue events and autoscale workers.
      *
      * @param object $event Queue event instance that triggered the listener.
+     * 
      * @return void
      */
     public function handle(object $event): void
@@ -73,6 +74,7 @@ class QueueAutoscalerListener
      * @param string $appName Heroku app name.
      * @param string $apiKey Heroku API key.
      * @param int $quantity Desired worker dyno quantity.
+     * 
      * @return void
      */
     protected function scaleWorkers(string $appName, string $apiKey, int $quantity): void
