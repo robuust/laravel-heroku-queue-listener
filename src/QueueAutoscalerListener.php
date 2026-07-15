@@ -6,7 +6,10 @@ namespace Robuust\HerokuQueueListener;
 
 use Exception;
 use HerokuClient\Client;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobQueued;
+use Illuminate\Queue\Worker;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -36,8 +39,22 @@ class QueueAutoscalerListener
         }
 
         if (Queue::size() === 0) {
+            if ($event instanceof JobProcessed || $event instanceof JobFailed) {
+                $this->stopWorker();
+            }
+
             $this->scaleWorkers($appName, $apiKey, 0);
         }
+    }
+
+    /**
+     * Stop the current worker before Heroku shuts down the dyno.
+     */
+    protected function stopWorker(): void
+    {
+        /** @var Worker $worker */
+        $worker = app('queue.worker');
+        $worker->shouldQuit = true;
     }
 
     /**
