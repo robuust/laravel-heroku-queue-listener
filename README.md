@@ -10,6 +10,8 @@ composer require robuust/laravel-heroku-queue-listener
 
 The package uses Laravel package auto-discovery.
 
+PCNTL is required for Laravel's worker signal and timeout handling. Heroku enables the extension automatically from the package's Composer requirements. Start shell-based workers with `exec php artisan queue:work` so PHP receives stop signals directly.
+
 ## Configuration
 
 Set the following environment variables:
