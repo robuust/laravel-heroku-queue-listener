@@ -30,3 +30,7 @@ Publish config if needed:
 ```bash
 php artisan vendor:publish --tag=queue-autoscaler-config
 ```
+
+## Releases
+
+After a changelog change is merged into `main`, GitHub Actions publishes the first changelog version as a tag and GitHub release at that exact commit. Existing releases are skipped; existing tags without a release fail for manual reconciliation. The workflow can also be rerun manually on `main`.
