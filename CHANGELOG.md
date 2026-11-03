@@ -1,3 +1,7 @@
+## 1.3.0 (03-11-2026)
+
+- Keep queue jobs moving during Heroku API delays with bounded requests and coordinated retries
+
 ## 1.2.2 (23-10-2026)
 
 - Require PCNTL so Laravel workers can handle stop signals and enforce job timeouts on Heroku
