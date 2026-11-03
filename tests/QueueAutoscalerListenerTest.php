@@ -12,9 +12,6 @@ use Http\Client\Exception\NetworkException;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository as CacheRepository;
 use Illuminate\Config\Repository as ConfigRepository;
-use Illuminate\Console\Scheduling\EventMutex;
-use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Console\Scheduling\SchedulingMutex;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Queue\Events\JobFailed;
@@ -32,7 +29,6 @@ use Psr\Log\LoggerInterface;
 use ReflectionClass;
 use ReflectionProperty;
 use Robuust\HerokuQueueListener\QueueAutoscalerListener;
-use Robuust\HerokuQueueListener\QueueAutoscalerServiceProvider;
 use RuntimeException;
 use Throwable;
 
@@ -100,18 +96,19 @@ class QueueAutoscalerListenerTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_success_is_cached_and_idle_scheduler_does_not_repeat_requests(): void
+    public function test_success_is_cached_until_next_event_after_cache_expiry(): void
     {
         $this->listener->scale(1);
         $this->listener->scale(1);
         Carbon::setTestNow(now()->addHours(2));
-        $this->listener->retryPending();
-
         self::assertCount(1, $this->http->requests);
         self::assertSame('PATCH', $this->http->requests[0]->getMethod());
         self::assertSame('/apps/test-app/formation/worker', $this->http->requests[0]->getUri()->getPath());
         self::assertSame('{"quantity":1}', (string) $this->http->requests[0]->getBody());
         self::assertCount(0, $this->reports);
+
+        $this->listener->scale(1);
+        self::assertCount(2, $this->http->requests);
     }
 
     #[DataProvider('transientStatuses')]
@@ -123,7 +120,6 @@ class QueueAutoscalerListenerTest extends TestCase
         for ($event = 0; $event < 100; $event++) {
             $this->listener->scale(1);
         }
-        $this->listener->retryPending();
 
         self::assertCount(1, $this->http->requests);
         self::assertNull($this->cache->get($this->key()));
@@ -133,7 +129,7 @@ class QueueAutoscalerListenerTest extends TestCase
         self::assertSame('request-123', $this->warnings[0]['request_id']);
 
         Carbon::setTestNow(now()->addMinutes(6));
-        $this->listener->retryPending();
+        $this->listener->scale(1);
 
         self::assertCount(2, $this->http->requests);
         self::assertSame(1, $this->cache->get($this->key()));
@@ -145,17 +141,17 @@ class QueueAutoscalerListenerTest extends TestCase
         return [[408], [429], [500], [502], [503], [504]];
     }
 
-    public function test_long_retry_after_applies_to_events_and_scheduler(): void
+    public function test_long_retry_after_defers_requests_until_an_event_after_the_cooldown(): void
     {
         $this->http->results = [new Response(429, ['Retry-After' => '900'], '{}')];
         $this->listener->scale(1);
         Carbon::setTestNow(now()->addSeconds(899));
         $this->listener->scale(1);
-        $this->listener->retryPending();
         self::assertCount(1, $this->http->requests);
 
         Carbon::setTestNow(now()->addSecond());
-        $this->listener->retryPending();
+        self::assertCount(1, $this->http->requests);
+        $this->listener->scale(1);
         self::assertCount(2, $this->http->requests);
     }
 
@@ -173,7 +169,7 @@ class QueueAutoscalerListenerTest extends TestCase
 
             Carbon::setTestNow(Carbon::createFromTimestampUTC($retry['after']));
             $listener = new TestListener(new Client(['apiKey' => 'test-secret', 'httpClient' => $this->http]));
-            $listener->retryPending();
+            $listener->scale(1);
         }
 
         self::assertCount(7, $this->http->requests);
@@ -183,7 +179,7 @@ class QueueAutoscalerListenerTest extends TestCase
         self::assertSame(1, $this->cache->get($this->key().':retry')['failures']);
     }
 
-    public function test_lock_contention_returns_immediately_and_scheduler_applies_latest_desire(): void
+    public function test_lock_contention_returns_immediately_and_retries_on_a_subsequent_event(): void
     {
         $lock = $this->cache->lock($this->key().':lock', 10);
         self::assertTrue($lock->get());
@@ -192,12 +188,14 @@ class QueueAutoscalerListenerTest extends TestCase
         self::assertCount(0, $this->http->requests);
 
         $lock->release();
-        $this->listener->retryPending();
+        self::assertCount(0, $this->http->requests);
+        self::assertSame(0, $this->cache->get($this->key().':desired'));
+        $this->listener->scale(0);
         self::assertCount(1, $this->http->requests);
         self::assertSame('{"quantity":0}', (string) $this->http->requests[0]->getBody());
     }
 
-    public function test_event_during_an_inflight_request_is_not_lost(): void
+    public function test_event_during_an_inflight_request_waits_for_a_subsequent_event(): void
     {
         $this->http->results = [function (): ResponseInterface {
             $this->listener->scale(0);
@@ -206,7 +204,9 @@ class QueueAutoscalerListenerTest extends TestCase
             return new Response(200, [], '{}');
         }];
         $this->listener->scale(1);
-        $this->listener->retryPending();
+        self::assertCount(1, $this->http->requests);
+        self::assertSame(0, $this->cache->get($this->key().':desired'));
+        $this->listener->scale(0);
 
         self::assertCount(2, $this->http->requests);
         self::assertSame('{"quantity":0}', (string) $this->http->requests[1]->getBody());
@@ -225,7 +225,7 @@ class QueueAutoscalerListenerTest extends TestCase
 
         $this->listener->scale(1);
         Carbon::setTestNow(now()->addMinutes(6));
-        $this->listener->retryPending();
+        $this->listener->scale(1);
         self::assertCount(3, $this->http->requests);
         self::assertSame('{"quantity":1}', (string) $this->http->requests[2]->getBody());
     }
@@ -236,9 +236,8 @@ class QueueAutoscalerListenerTest extends TestCase
         $this->http->results = [new Response($httpStatus, [], '{}')];
         $this->listener->scale(1);
         Carbon::setTestNow(now()->addMinutes(10));
-        $this->listener->retryPending();
         self::assertCount(1, $this->http->requests);
-        self::assertNull($this->warnings[0]['retry_in_seconds']);
+        self::assertGreaterThanOrEqual(30, $this->warnings[0]['retry_in_seconds']);
 
         $this->listener->scale(1);
         self::assertCount(2, $this->http->requests);
@@ -288,7 +287,7 @@ class QueueAutoscalerListenerTest extends TestCase
         self::assertTrue($this->worker->shouldQuit);
         self::assertCount(1, $this->http->requests);
         Carbon::setTestNow(now()->addMinutes(6));
-        $this->listener->retryPending();
+        $this->listener->handle((new ReflectionClass(JobFailed::class))->newInstanceWithoutConstructor());
         self::assertSame(0, $this->cache->get($this->key()));
     }
 
@@ -305,34 +304,26 @@ class QueueAutoscalerListenerTest extends TestCase
         self::assertFalse($this->worker->shouldQuit);
     }
 
-    public function test_missing_credentials_disable_events_and_scheduled_retries(): void
+    public function test_missing_credentials_disable_scaling_on_queue_events(): void
     {
         $this->config->set('queue-autoscaler.heroku_api_key', '');
         $this->listener->handle((new ReflectionClass(JobQueued::class))->newInstanceWithoutConstructor());
-        $this->listener->retryPending();
 
         self::assertCount(0, $this->http->requests);
     }
 
-    public function test_scheduler_callback_can_restart_workers_without_a_running_worker(): void
+    public function test_failed_worker_start_waits_for_another_queue_event(): void
     {
         $this->http->results = [fn (RequestInterface $request): never => throw new NetworkException('timed out', $request)];
-        $this->listener->scale(1);
-        $this->container->instance(QueueAutoscalerListener::class, $this->listener);
-        $this->container->instance(EventMutex::class, $this->createMock(EventMutex::class));
-        $this->container->instance(SchedulingMutex::class, $this->createMock(SchedulingMutex::class));
-
-        $schedule = new Schedule;
-        (new QueueAutoscalerServiceProvider($this->container))->registerSchedule($schedule);
-        self::assertCount(1, $schedule->events());
-        $event = $schedule->events()[0];
-        self::assertSame('* * * * *', $event->expression);
-        self::assertSame('queue-autoscaler:retry', $event->description);
+        $this->listener->handle((new ReflectionClass(JobQueued::class))->newInstanceWithoutConstructor());
+        self::assertCount(1, $this->http->requests);
 
         Carbon::setTestNow(now()->addMinutes(6));
-        $event->run($this->container);
+        self::assertCount(1, $this->http->requests);
+        $this->listener->handle((new ReflectionClass(JobQueued::class))->newInstanceWithoutConstructor());
         self::assertCount(2, $this->http->requests);
         self::assertSame(1, $this->cache->get($this->key()));
+        self::assertFalse($this->worker->shouldQuit);
     }
 
     public function test_production_client_has_bounded_connection_and_total_timeouts(): void

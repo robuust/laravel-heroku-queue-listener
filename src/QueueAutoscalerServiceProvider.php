@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Robuust\HerokuQueueListener;
 
-use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobQueued;
@@ -29,8 +28,6 @@ class QueueAutoscalerServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->callAfterResolving(Schedule::class, [$this, 'registerSchedule']);
-
         $this->publishes([
             __DIR__.'/../config/queue-autoscaler.php' => config_path('queue-autoscaler.php'),
         ], 'queue-autoscaler-config');
@@ -44,17 +41,5 @@ class QueueAutoscalerServiceProvider extends ServiceProvider
         if (is_string($releaseEvent) && $releaseEvent !== '' && class_exists($releaseEvent)) {
             Event::listen($releaseEvent, QueueAutoscalerListener::class);
         }
-    }
-
-    /**
-     * Retry pending scaling outside the worker queue, even when workers are off.
-     *
-     * @param  Schedule  $schedule  The application's scheduler.
-     */
-    public function registerSchedule(Schedule $schedule): void
-    {
-        $schedule->call(QueueAutoscalerListener::class.'@retryPending')
-            ->name('queue-autoscaler:retry')
-            ->everyMinute();
     }
 }

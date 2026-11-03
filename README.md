@@ -41,26 +41,24 @@ listener. A non-blocking cache lock allows only one scaling request per app at a
 time; concurrent events retain the latest desired worker count instead of
 creating more requests or retry jobs.
 
-Network failures, HTTP 408, HTTP 429 and HTTP 5xx responses leave a pending
-change. Subsequent events and a scheduler callback retry after an exponential
-cooldown (30, 60, 120, 240, then 300 seconds, with up to 25% jitter, capped at
+Failed requests set a shared exponential cooldown (30, 60, 120, 240, then
+300 seconds, with up to 25% jitter, capped at
 300 seconds). A valid `Retry-After` in seconds or HTTP-date format can extend
-that cooldown beyond 300 seconds. Success clears the failure count. Other errors
-are reported without automatic retries; a later queue event may try again after
-the cooldown. A failed request invalidates the cached worker count because a
-timed-out PATCH may already have reached Heroku.
+that cooldown beyond 300 seconds. Success clears the failure count. A later
+queue or configured application release event may try again after the cooldown.
+A failed request invalidates the cached worker count because a timed-out PATCH
+may already have reached Heroku.
 
-Run Laravel's scheduler independently of the autoscaled worker, for example
-`php artisan schedule:run` every minute from cron or a separate scheduler
-process. The package registers `queue-autoscaler:retry` automatically. It checks
-only pending changes and does not enqueue retry jobs. A retry runs on the first
-scheduler tick or queue event after the cooldown expires. Without a running
-scheduler, pending changes require another queue event and a failed startup
-attempt can leave queued work waiting.
+The package registers no scheduled tasks and starts no background retry process.
+It makes requests only in response to existing queue or application release
+events. Cooldown expiry alone does not trigger a request. If a worker startup
+fails and no subsequent event occurs after the cooldown, queued work remains
+waiting until another event retries the scaling request. Likewise, a request
+skipped because another request holds the lock requires a subsequent event.
 
 Use a shared persistent cache supporting atomic locks (for example Redis) across
-all application dynos and the scheduler. Local file or array caches do not
-coordinate requests between dynos. State keys are scoped by Heroku app name,
+all application dynos. Local file or array caches do not coordinate requests
+between dynos. State keys are scoped by Heroku app name,
 under the configured cache key; the previous unscoped cached count is ignored.
 
 Failures log the HTTP status, `Request-Id`, `RateLimit-Remaining`, `Retry-After`

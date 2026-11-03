@@ -1,6 +1,6 @@
 ## 1.3.0 (03-11-2026)
 
-- Keep queue jobs moving during Heroku API delays with bounded requests and coordinated retries
+- Keep queue jobs moving during Heroku API delays with bounded requests and retries on subsequent queue events
 
 ## 1.2.2 (23-10-2026)
 

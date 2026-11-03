@@ -13,10 +13,9 @@ use Illuminate\Queue\Worker;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
-use Psr\Http\Client\NetworkExceptionInterface;
 
 /**
- * Coalesces worker scaling requests and defers retries without delaying queue jobs.
+ * Coalesces worker scaling requests and defers retries to subsequent queue events.
  */
 class QueueAutoscalerListener
 {
@@ -68,7 +67,7 @@ class QueueAutoscalerListener
     }
 
     /**
-     * Scale Heroku workers to the specified quantity.
+     * Make at most one bounded scaling request per event using a non-blocking lock.
      *
      * @param  string  $appName  The Heroku application name.
      * @param  string  $apiKey  The Heroku API credential.
@@ -79,32 +78,6 @@ class QueueAutoscalerListener
         $cacheKey = $this->cacheKey($appName);
         Cache::forever($cacheKey.':desired', $quantity);
 
-        $this->synchronize($appName, $apiKey, true);
-    }
-
-    /**
-     * Retry pending changes from the scheduler, independently of worker availability.
-     */
-    public function retryPending(): void
-    {
-        $apiKey = (string) config('queue-autoscaler.heroku_api_key');
-        $appName = (string) config('queue-autoscaler.heroku_app_name');
-
-        if ($apiKey !== '' && $appName !== '') {
-            $this->synchronize($appName, $apiKey);
-        }
-    }
-
-    /**
-     * Make at most one bounded request while holding a non-blocking application lock.
-     *
-     * @param  string  $appName  The Heroku application name.
-     * @param  string  $apiKey  The Heroku API credential.
-     * @param  bool  $fromEvent  Whether an event should recheck the expiring current-count cache.
-     */
-    private function synchronize(string $appName, string $apiKey, bool $fromEvent = false): void
-    {
-        $cacheKey = $this->cacheKey($appName);
         $lock = Cache::lock($cacheKey.':lock', self::HTTP_TIMEOUT_SECONDS + 5);
 
         if (! $lock->get()) {
@@ -115,17 +88,13 @@ class QueueAutoscalerListener
             $quantity = Cache::get($cacheKey.':desired');
             $retry = Cache::get($cacheKey.':retry', ['failures' => 0, 'after' => 0]);
 
-            if ($quantity === null
-                || (! $fromEvent && Cache::get($cacheKey.':settled') === $quantity)
-                || $retry['after'] > now()->getTimestamp()) {
+            if ($quantity === null || $retry['after'] > now()->getTimestamp()) {
                 return;
             }
 
             $currentDynos = Cache::get($cacheKey);
 
             if ($currentDynos === $quantity) {
-                Cache::forever($cacheKey.':settled', $quantity);
-
                 return;
             }
 
@@ -136,23 +105,15 @@ class QueueAutoscalerListener
             } catch (Exception $exception) {
                 $response = $client->getLastHttpResponse();
                 $httpStatus = $response?->getStatusCode();
-                $retryable = $exception instanceof NetworkExceptionInterface
-                    || in_array($httpStatus, [408, 429], true)
-                    || ($httpStatus !== null && $httpStatus >= 500);
                 $failures = min($retry['failures'] + 1, 5);
                 $delay = (new RetryPolicy)->delay($failures, $response);
 
                 // A timed-out PATCH may already have changed the formation.
                 Cache::forget($cacheKey);
-                Cache::forget($cacheKey.':settled');
                 Cache::forever($cacheKey.':retry', [
                     'failures' => $failures,
                     'after' => now()->getTimestamp() + $delay,
                 ]);
-
-                if (! $retryable) {
-                    Cache::forever($cacheKey.':settled', $quantity);
-                }
 
                 Log::warning('Queue autoscaler request failed', [
                     'to' => $quantity,
@@ -160,7 +121,7 @@ class QueueAutoscalerListener
                     'request_id' => $response?->getHeaderLine('Request-Id'),
                     'rate_limit_remaining' => $response?->getHeaderLine('RateLimit-Remaining'),
                     'retry_after' => $response?->getHeaderLine('Retry-After'),
-                    'retry_in_seconds' => $retryable ? $delay : null,
+                    'retry_in_seconds' => $delay,
                     'exception_class' => $exception::class,
                 ]);
 
@@ -171,7 +132,6 @@ class QueueAutoscalerListener
             }
 
             Cache::put($cacheKey, $quantity, now()->addSeconds((int) config('queue-autoscaler.cache_ttl_seconds', 3600)));
-            Cache::forever($cacheKey.':settled', $quantity);
             Cache::forget($cacheKey.':retry');
 
             Log::info('Queue autoscaler adjusted workers', [
