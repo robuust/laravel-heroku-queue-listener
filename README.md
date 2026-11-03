@@ -70,8 +70,3 @@ The Platform API documents `RateLimit-Remaining`, but does not promise a
 
 References: [Heroku Platform API](https://devcenter.heroku.com/articles/platform-api-reference#rate-limits)
 and [HTTP Retry-After](https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after).
-
-## Development
-
-Install dependencies with `composer install`. Run `composer lint` for PHP style
-checks.
