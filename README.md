@@ -74,6 +74,4 @@ and [HTTP Retry-After](https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-af
 ## Development
 
 Install dependencies with `composer install`. Run `composer lint` for PHP style
-checks and `composer test` for the regression suite. Tests use a fake HTTP
-transport and an in-memory cache; they do not contact Heroku. This repository
-has no CI coverage threshold configured.
+checks.

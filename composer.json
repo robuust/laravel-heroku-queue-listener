@@ -14,10 +14,7 @@
         "php-heroku-client/php-heroku-client": "^4.0"
     },
     "require-dev": {
-        "illuminate/config": "^10.0|^11.0|^12.0|^13.0",
-        "laravel/pint": "^1.0",
-        "phpunit/phpunit": "^11.5",
-        "psr/log": "^3.0"
+        "laravel/pint": "^1.0"
     },
     "autoload": {
         "psr-4": {
@@ -32,8 +29,7 @@
         }
     },
     "scripts": {
-        "lint": "pint --test",
-        "test": "phpunit"
+        "lint": "pint --test"
     },
     "minimum-stability": "stable",
     "prefer-stable": true

@@ -95,7 +95,13 @@ class QueueAutoscalerListener
                 return;
             }
 
-            $client = $this->createClient($apiKey);
+            $client = new Client([
+                'apiKey' => $apiKey,
+                'curlOptions' => [
+                    CURLOPT_CONNECTTIMEOUT => 2,
+                    CURLOPT_TIMEOUT => self::HTTP_TIMEOUT_SECONDS,
+                ],
+            ]);
 
             try {
                 $client->patch('apps/'.rawurlencode($appName).'/formation/worker', ['quantity' => $quantity]);
@@ -140,22 +146,5 @@ class QueueAutoscalerListener
         } finally {
             $lock->release();
         }
-    }
-
-    /**
-     * Create a Heroku client with finite connection and total request timeouts.
-     *
-     * @param  string  $apiKey  The Heroku API credential.
-     * @return Client The configured Heroku client.
-     */
-    protected function createClient(string $apiKey): Client
-    {
-        return new Client([
-            'apiKey' => $apiKey,
-            'curlOptions' => [
-                CURLOPT_CONNECTTIMEOUT => 2,
-                CURLOPT_TIMEOUT => self::HTTP_TIMEOUT_SECONDS,
-            ],
-        ]);
     }
 }
