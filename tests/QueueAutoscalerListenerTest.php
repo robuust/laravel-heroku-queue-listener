@@ -189,7 +189,7 @@ class QueueAutoscalerListenerTest extends TestCase
 
         $lock->release();
         self::assertCount(0, $this->http->requests);
-        self::assertSame(0, $this->cache->get($this->key().':desired'));
+        self::assertNull($this->cache->get($this->key()));
         $this->listener->scale(0);
         self::assertCount(1, $this->http->requests);
         self::assertSame('{"quantity":0}', (string) $this->http->requests[0]->getBody());
@@ -205,7 +205,7 @@ class QueueAutoscalerListenerTest extends TestCase
         }];
         $this->listener->scale(1);
         self::assertCount(1, $this->http->requests);
-        self::assertSame(0, $this->cache->get($this->key().':desired'));
+        self::assertSame(1, $this->cache->get($this->key()));
         $this->listener->scale(0);
 
         self::assertCount(2, $this->http->requests);

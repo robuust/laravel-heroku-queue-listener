@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
 /**
- * Coalesces worker scaling requests and defers retries to subsequent queue events.
+ * Serializes worker scaling requests and defers retries to subsequent queue events.
  */
 class QueueAutoscalerListener
 {
@@ -71,13 +71,11 @@ class QueueAutoscalerListener
      *
      * @param  string  $appName  The Heroku application name.
      * @param  string  $apiKey  The Heroku API credential.
-     * @param  int  $quantity  The latest desired worker count.
+     * @param  int  $quantity  The worker count requested by this event.
      */
     protected function scaleWorkers(string $appName, string $apiKey, int $quantity): void
     {
-        $cacheKey = $this->cacheKey($appName);
-        Cache::forever($cacheKey.':desired', $quantity);
-
+        $cacheKey = (string) config('queue-autoscaler.cache_key', 'queue-autoscaler:current-dynos').':'.sha1($appName);
         $lock = Cache::lock($cacheKey.':lock', self::HTTP_TIMEOUT_SECONDS + 5);
 
         if (! $lock->get()) {
@@ -85,10 +83,9 @@ class QueueAutoscalerListener
         }
 
         try {
-            $quantity = Cache::get($cacheKey.':desired');
             $retry = Cache::get($cacheKey.':retry', ['failures' => 0, 'after' => 0]);
 
-            if ($quantity === null || $retry['after'] > now()->getTimestamp()) {
+            if ($retry['after'] > now()->getTimestamp()) {
                 return;
             }
 
@@ -160,16 +157,5 @@ class QueueAutoscalerListener
                 CURLOPT_TIMEOUT => self::HTTP_TIMEOUT_SECONDS,
             ],
         ]);
-    }
-
-    /**
-     * Namespace formation state by application, including when caches are shared.
-     *
-     * @param  string  $appName  The Heroku application name.
-     * @return string The application-specific cache key.
-     */
-    private function cacheKey(string $appName): string
-    {
-        return (string) config('queue-autoscaler.cache_key', 'queue-autoscaler:current-dynos').':'.sha1($appName);
     }
 }

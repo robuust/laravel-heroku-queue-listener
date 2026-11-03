@@ -38,8 +38,8 @@ php artisan vendor:publish --tag=queue-autoscaler-config
 Each scaling attempt has a 2-second connection timeout and a 5-second total
 timeout. There are no sleeps or immediate HTTP retries in the queue event
 listener. A non-blocking cache lock allows only one scaling request per app at a
-time; concurrent events retain the latest desired worker count instead of
-creating more requests or retry jobs.
+time. Each event requests its own worker count; concurrent events that cannot
+acquire the lock return immediately without queuing another request.
 
 Failed requests set a shared exponential cooldown (30, 60, 120, 240, then
 300 seconds, with up to 25% jitter, capped at
