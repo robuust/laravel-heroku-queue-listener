@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'heroku_control_url' => env('HEROKU_CONTROL_URL'),
+    'heroku_control_token' => env('HEROKU_CONTROL_TOKEN'),
     'heroku_api_key' => env('HEROKU_API_KEY'),
     'heroku_app_name' => env('HEROKU_APP_NAME'),
 

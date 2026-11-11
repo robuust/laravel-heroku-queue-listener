@@ -13,15 +13,13 @@ use Illuminate\Queue\Worker;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use UnexpectedValueException;
 
 /**
  * Serializes worker scaling requests and defers retries to subsequent queue events.
  */
 class QueueAutoscalerListener
 {
-    /** @var int Maximum duration of a Heroku request, including connection setup. */
-    private const HTTP_TIMEOUT_SECONDS = 5;
-
     /**
      * Handle queue events and autoscale workers.
      *
@@ -29,10 +27,15 @@ class QueueAutoscalerListener
      */
     public function handle(object $event): void
     {
-        $apiKey = (string) config('queue-autoscaler.heroku_api_key');
         $appName = (string) config('queue-autoscaler.heroku_app_name');
 
-        if ($apiKey === '' || $appName === '') {
+        if ($appName === '') {
+            return;
+        }
+
+        $client = ClientFactory::create();
+
+        if ($client === null) {
             return;
         }
 
@@ -42,7 +45,7 @@ class QueueAutoscalerListener
         $shouldScaleUp = $event instanceof JobQueued || ($isReleaseEvent && Queue::size() > 0);
 
         if ($shouldScaleUp) {
-            $this->scaleWorkers($appName, $apiKey, 1);
+            $this->scaleWorkers($appName, $client, 1);
 
             return;
         }
@@ -52,7 +55,7 @@ class QueueAutoscalerListener
                 $this->stopWorker();
             }
 
-            $this->scaleWorkers($appName, $apiKey, 0);
+            $this->scaleWorkers($appName, $client, 0);
         }
     }
 
@@ -70,13 +73,13 @@ class QueueAutoscalerListener
      * Make at most one bounded scaling request per event using a non-blocking lock.
      *
      * @param  string  $appName  The Heroku application name.
-     * @param  string  $apiKey  The Heroku API credential.
+     * @param  Client  $client  The configured gateway or direct Heroku client.
      * @param  int  $quantity  The worker count requested by this event.
      */
-    protected function scaleWorkers(string $appName, string $apiKey, int $quantity): void
+    protected function scaleWorkers(string $appName, Client $client, int $quantity): void
     {
         $cacheKey = (string) config('queue-autoscaler.cache_key', 'queue-autoscaler:current-dynos').':'.sha1($appName);
-        $lock = Cache::lock($cacheKey.':lock', self::HTTP_TIMEOUT_SECONDS + 5);
+        $lock = Cache::lock($cacheKey.':lock', ClientFactory::timeoutSeconds() + 5);
 
         if (! $lock->get()) {
             return;
@@ -95,21 +98,20 @@ class QueueAutoscalerListener
                 return;
             }
 
-            $client = new Client([
-                'apiKey' => $apiKey,
-                'curlOptions' => [
-                    CURLOPT_CONNECTTIMEOUT => 2,
-                    CURLOPT_TIMEOUT => self::HTTP_TIMEOUT_SECONDS,
-                ],
-            ]);
-
             try {
                 $client->patch('apps/'.rawurlencode($appName).'/formation/worker', ['quantity' => $quantity]);
+
+                // The HTTP client accepts redirects even when following them is disabled.
+                $httpStatus = $client->getLastHttpResponse()->getStatusCode();
+
+                if ($httpStatus < 200 || $httpStatus >= 300) {
+                    throw new UnexpectedValueException('Worker scaling did not return a successful HTTP status.');
+                }
             } catch (Exception $exception) {
                 $response = $client->getLastHttpResponse();
                 $httpStatus = $response?->getStatusCode();
                 $failures = min($retry['failures'] + 1, 5);
-                $delay = (new RetryPolicy)->delay($failures, $response);
+                $delay = (new RetryPolicy())->delay($failures, $response);
 
                 // A timed-out PATCH may already have changed the formation.
                 Cache::forget($cacheKey);

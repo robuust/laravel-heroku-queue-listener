@@ -16,10 +16,30 @@ If a shell script launches the worker, use `exec php artisan queue:work` as its 
 
 ## Configuration
 
-Set the following environment variables:
+For Heroku Control, set the following environment variables:
 
-- `HEROKU_API_KEY`
+- `HEROKU_CONTROL_URL` (the HTTPS gateway base URL)
+- `HEROKU_CONTROL_TOKEN` (the app or review-pipeline worker credential)
 - `HEROKU_APP_NAME`
+
+The gateway URL and token must be configured together. Partial or invalid gateway
+configuration raises a configuration error and never falls back to a legacy
+credential. Redirects are disabled for gateway requests. Only the worker
+formation endpoint is used; this package does not request deployment permission.
+
+Existing applications can continue to use `HEROKU_API_KEY` and `HEROKU_APP_NAME`
+when neither gateway setting is configured. Gateway tokens must not be placed in
+`HEROKU_API_KEY`. To migrate, provision a scoped worker credential outside the
+application, configure the gateway pair, and remove `HEROKU_API_KEY` from that
+application after the gateway path is verified. Do not revoke a shared legacy
+credential while other applications still use it.
+
+Laravel merges the new `heroku_control_url` and `heroku_control_token` defaults
+even when an application has an older published configuration file. Republishing
+is optional; add those keys from the package's config if you manage them there.
+Rebuild Laravel's configuration cache after updating the package and settings
+with `php artisan config:cache`. The listener reads Laravel configuration and
+does not access environment variables directly.
 
 Optional:
 
@@ -35,8 +55,11 @@ php artisan vendor:publish --tag=queue-autoscaler-config
 
 ## HTTP failures and retries
 
-Each scaling attempt has a 2-second connection timeout and a 5-second total
-timeout. There are no sleeps or immediate HTTP retries in the queue event
+Each scaling attempt has a 2-second connection timeout. Direct Heroku requests
+have a 5-second total timeout; gateway requests have a 35-second total timeout,
+longer than the gateway's 30-second execution limit. The cache lock expires five
+seconds after the selected request timeout. Redirects are treated as failed
+requests. There are no sleeps or immediate HTTP retries in the queue event
 listener. A non-blocking cache lock allows only one scaling request per app at a
 time. Each event requests its own worker count; concurrent events that cannot
 acquire the lock return immediately without queuing another request.
@@ -55,6 +78,9 @@ events. Cooldown expiry alone does not trigger a request. If a worker startup
 fails and no subsequent event occurs after the cooldown, queued work remains
 waiting until another event retries the scaling request. Likewise, a request
 skipped because another request holds the lock requires a subsequent event.
+
+The listener requests one worker when jobs are queued and zero when the queue is
+empty, regardless of queue depth.
 
 Use a shared persistent cache supporting atomic locks (for example Redis) across
 all application dynos. Local file or array caches do not coordinate requests
