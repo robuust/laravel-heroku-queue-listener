@@ -1,3 +1,7 @@
+## 1.4.0 (11-11-2026)
+
+- Support scoped Heroku Control credentials for queue worker autoscaling
+
 ## 1.3.0 (03-11-2026)
 
 - Keep queue jobs moving during Heroku API delays with bounded requests and retries on subsequent queue events
