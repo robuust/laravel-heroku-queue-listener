@@ -9,6 +9,9 @@ return [
     // Optionally listen to an application release event and scale up only when jobs exist.
     'release_event' => env('QUEUE_AUTOSCALER_RELEASE_EVENT', 'App\\Events\\AppReleased'),
 
+    // Match the queues consumed by the worker; null uses the connection's default queue.
+    'queues' => [null],
+
     'cache_key' => env('QUEUE_AUTOSCALER_CACHE_KEY', 'queue-autoscaler:current-dynos'),
     'cache_ttl_seconds' => (int) env('QUEUE_AUTOSCALER_CACHE_TTL_SECONDS', 3600),
 ];

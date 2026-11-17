@@ -1,3 +1,7 @@
+## 1.4.2 (17-11-2026)
+
+- Monitor all configured worker queues before starting or stopping the worker
+
 ## 1.4.1 (17-11-2026)
 
 - Avoid redundant worker scaling requests when cached counts are returned as numeric strings

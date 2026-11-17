@@ -42,7 +42,7 @@ class QueueAutoscalerListener
         $releaseEventClass = config('queue-autoscaler.release_event');
         $isReleaseEvent = is_string($releaseEventClass) && $releaseEventClass !== '' && is_a($event, $releaseEventClass);
 
-        $shouldScaleUp = $event instanceof JobQueued || ($isReleaseEvent && Queue::size() > 0);
+        $shouldScaleUp = $event instanceof JobQueued || ($isReleaseEvent && $this->hasPendingJobs());
 
         if ($shouldScaleUp) {
             $this->scaleWorkers($appName, $client, 1);
@@ -50,13 +50,29 @@ class QueueAutoscalerListener
             return;
         }
 
-        if (Queue::size() === 0) {
+        if (! $this->hasPendingJobs()) {
             if ($event instanceof JobProcessed || $event instanceof JobFailed) {
                 $this->stopWorker();
             }
 
             $this->scaleWorkers($appName, $client, 0);
         }
+    }
+
+    /**
+     * Check whether any configured worker queue still contains jobs.
+     *
+     * @return bool
+     */
+    protected function hasPendingJobs(): bool
+    {
+        foreach (config('queue-autoscaler.queues') as $queue) {
+            if (Queue::size($queue) > 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

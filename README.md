@@ -53,6 +53,28 @@ Publish config if needed:
 php artisan vendor:publish --tag=queue-autoscaler-config
 ```
 
+### Worker queues
+
+The `queue-autoscaler.queues` setting accepts an array containing queue names and/or `null`.
+It defaults to `[null]`, which monitors the default queue of Laravel's default
+queue connection and preserves the existing single-queue behavior. Laravel
+merges this default even when an older published configuration omits the key.
+
+Set the list to exactly the queues consumed by your worker. For example, a
+worker started with `php artisan queue:work --queue=high,default` needs:
+
+```php
+'queues' => ['high', 'default'],
+```
+
+On the configured release event, the listener requests a worker when any listed
+queue has jobs. It stops the worker and scales to zero only when every listed
+queue is empty. Queue sizes include reserved and delayed jobs for Laravel's
+database and Redis drivers, so those jobs keep the worker alive. The list does
+not change the worker's queue priority; set that with `queue:work --queue`.
+Normal `JobQueued` events continue to request a worker as before. Rebuild the
+application's configuration cache after changing the list.
+
 ## HTTP failures and retries
 
 Each scaling attempt has a 2-second connection timeout. Direct Heroku requests
@@ -79,8 +101,8 @@ fails and no subsequent event occurs after the cooldown, queued work remains
 waiting until another event retries the scaling request. Likewise, a request
 skipped because another request holds the lock requires a subsequent event.
 
-The listener requests one worker when jobs are queued and zero when the queue is
-empty, regardless of queue depth.
+The listener requests one worker when jobs are queued and zero when all configured
+queues are empty, regardless of queue depth.
 
 Use a shared persistent cache supporting atomic locks (for example Redis) across
 all application dynos. Local file or array caches do not coordinate requests
