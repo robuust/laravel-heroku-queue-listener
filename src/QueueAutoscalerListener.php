@@ -94,7 +94,7 @@ class QueueAutoscalerListener
 
             $currentDynos = Cache::get($cacheKey);
 
-            if ($currentDynos === $quantity) {
+            if (in_array($currentDynos, [$quantity, (string) $quantity], true)) {
                 return;
             }
 

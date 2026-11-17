@@ -1,3 +1,7 @@
+## 1.4.1 (17-11-2026)
+
+- Avoid redundant worker scaling requests when cached counts are returned as numeric strings
+
 ## 1.4.0 (11-11-2026)
 
 - Support scoped Heroku Control credentials for queue worker autoscaling
